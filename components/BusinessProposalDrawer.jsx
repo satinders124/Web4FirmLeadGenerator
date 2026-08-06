@@ -17,6 +17,7 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
   const [recipient, setRecipient] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [sms, setSms] = useState("");
   const [phase, setPhase] = useState("idle");
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState(false);
@@ -26,6 +27,7 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
     setRecipient("");
     setSubject("");
     setBody("");
+    setSms("");
     setPhase("idle");
     setMessage("");
     setPreview(false);
@@ -45,6 +47,7 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
       setProposal(data.proposal);
       setSubject(data.proposal.email.subject);
       setBody(data.proposal.email.text);
+      setSms(data.proposal.sms || "");
       setPhase("ready");
       setMessage(`Tailored proposal ready${data.model ? ` with ${data.model}` : ""}. Review every detail before sending.`);
     } catch (error) {
@@ -92,6 +95,49 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
     }
   }
 
+  async function copySms() {
+    try {
+      await navigator.clipboard.writeText(sms);
+      setMessage("SMS copy copied to your clipboard.");
+    } catch {
+      setMessage("Copy is unavailable in this browser.");
+    }
+  }
+
+  function openSmsDraft() {
+    if (!lead.phone) {
+      setMessage("This business does not have a phone number listed.");
+      setPhase("error");
+      return;
+    }
+    const number = String(lead.phone).replace(/[^+\d]/g, "");
+    window.location.href = `sms:${number}?body=${encodeURIComponent(sms)}`;
+    setMessage("SMS draft opened. Send it manually, then mark it as sent below.");
+  }
+
+  async function markSmsSent() {
+    if (!lead.phone || !sms.trim()) {
+      setMessage("A phone number and SMS message are required.");
+      setPhase("error");
+      return;
+    }
+    try {
+      const response = await fetch("/api/crm/sms", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead, recipientPhone: lead.phone, bodyText: sms, status: "sent" }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to save SMS activity.");
+      onMarkContacted(lead.id);
+      setPhase("sent");
+      setMessage("SMS marked as sent and saved in the outreach pipeline.");
+    } catch (error) {
+      setPhase("error");
+      setMessage(error.message || "Unable to save SMS activity.");
+    }
+  }
+
   return (
     <div className="proposal-overlay" role="dialog" aria-modal="true" aria-label={`Proposal for ${lead.name}`}>
       <aside className="proposal-drawer">
@@ -119,6 +165,13 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
             {!preview ? <div className="proposal-email-form"><label>Recipient email<input type="email" value={recipient} onChange={(event) => setRecipient(event.target.value)} placeholder="owner@business.com" /></label><label>Subject<input value={subject} onChange={(event) => setSubject(event.target.value)} /></label><label>Email message<textarea rows="12" value={body} onChange={(event) => setBody(event.target.value)} /></label></div> : <div className="email-read-preview"><p><strong>To:</strong> {recipient || "Enter recipient in Edit"}</p><p><strong>Subject:</strong> {subject}</p><div>{body.split("\n").map((line, index) => <p key={`${line}-${index}`}>{line || " "}</p>)}</div></div>}
             <div className="proposal-send-row"><div><button type="button" onClick={copyEmail} className="copy-button"><Icon name="copy" size={16} /> Copy email</button><span>AI copy is a draft—review it before sending.</span></div><button type="button" onClick={sendEmail} disabled={phase === "sending"} className="send-reviewed-button"><Icon name="send" size={17} /> {phase === "sending" ? "Sending…" : phase === "sent" ? "Sent" : "Send reviewed email"}</button></div>
             {message && <p className={`proposal-message ${phase === "error" ? "error" : phase === "sent" ? "success" : ""}`}>{message}</p>}
+          </div>
+
+          <div className="proposal-sms">
+            <div className="proposal-sms-heading"><div><p className="drawer-eyebrow">Manual text message</p><h3>Short, respectful SMS option</h3><p>Open the phone&apos;s message composer, review the draft and send it manually.</p></div><span><Icon name="message" size={18} /></span></div>
+            <label>SMS message <small>{sms.length}/320</small><textarea rows="4" value={sms} onChange={(event) => setSms(event.target.value.slice(0, 320))} /></label>
+            <div className="proposal-sms-actions"><button type="button" className="copy-button" onClick={copySms}><Icon name="copy" size={16} /> Copy SMS</button><button type="button" className="open-sms-button" onClick={openSmsDraft} disabled={!lead.phone}><Icon name="message" size={16} /> Open SMS draft</button><button type="button" className="mark-sms-button" onClick={markSmsSent} disabled={!lead.phone || !sms.trim()}><Icon name="check" size={16} /> Mark SMS sent</button></div>
+            <p>For manual sending only. Web4Firm will not send text messages automatically.</p>
           </div>
         </>}
       </aside>

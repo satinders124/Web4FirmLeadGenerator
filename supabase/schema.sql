@@ -36,6 +36,7 @@ create table if not exists public.proposals (
   email_subject text,
   email_html text,
   email_text text,
+  sms_text text,
   created_at timestamptz not null default now()
 );
 
@@ -60,6 +61,16 @@ create table if not exists public.outreach_events (
   event_type text not null,
   payload jsonb not null default '{}'::jsonb,
   occurred_at timestamptz not null default now(),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.outreach_sms (
+  id uuid primary key default gen_random_uuid(),
+  lead_id uuid not null references public.leads(id) on delete cascade,
+  recipient_phone text not null,
+  body_text text not null,
+  status text check (status in ('draft', 'opened', 'sent', 'failed')) default 'draft',
+  sent_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -91,12 +102,14 @@ before update on public.leads
 for each row execute function public.set_updated_at();
 
 alter table public.inbound_replies add column if not exists provider_message_id text;
+alter table public.proposals add column if not exists sms_text text;
 create unique index if not exists inbound_replies_provider_message_idx on public.inbound_replies(provider_message_id);
 
 create index if not exists leads_status_idx on public.leads(status);
 create index if not exists leads_created_at_idx on public.leads(created_at desc);
 create index if not exists outreach_lead_idx on public.outreach_emails(lead_id);
 create index if not exists outreach_provider_idx on public.outreach_emails(provider_message_id);
+create index if not exists outreach_sms_lead_idx on public.outreach_sms(lead_id);
 create index if not exists replies_lead_idx on public.inbound_replies(lead_id);
 
 -- The application uses the Supabase service role key only from server-side Next.js API routes.
@@ -105,4 +118,5 @@ alter table public.leads enable row level security;
 alter table public.proposals enable row level security;
 alter table public.outreach_emails enable row level security;
 alter table public.outreach_events enable row level security;
+alter table public.outreach_sms enable row level security;
 alter table public.inbound_replies enable row level security;

@@ -36,6 +36,7 @@ function normalizeProposal(value, lead) {
       html: String(email.html || `<p>Hi ${lead.name},</p><p>I noticed an opportunity to improve your online presence. Web4Firm can help with a clear, mobile-friendly website that makes it easier for customers to find and contact you.</p><p>Would you be open to a short, no-pressure conversation?</p><p>Kind regards,<br />Web4Firm</p>`).slice(0, 12000),
       text: String(email.text || `Hi ${lead.name},\n\nI noticed an opportunity to improve your online presence. Web4Firm can help with a clear, mobile-friendly website that makes it easier for customers to find and contact you.\n\nWould you be open to a short, no-pressure conversation?\n\nKind regards,\nWeb4Firm`).slice(0, 7000),
     },
+    sms: String(proposal.sms || `Hi ${lead.name}, I noticed an opportunity to strengthen your online presence with a clear, mobile-friendly website. Would you be open to a quick no-pressure chat? — Web4Firm`).replace(/\s+/g, " ").trim().slice(0, 320),
   };
 }
 
@@ -113,7 +114,8 @@ Return ONLY valid JSON with this exact shape:
   "headline": "string",
   "summary": "string",
   "websitePlan": { "pages": ["string"], "features": ["string"], "benefits": ["string"] },
-  "email": { "subject": "string", "html": "safe HTML using only p, strong, ul, li, br tags", "text": "plain text equivalent" }
+  "email": { "subject": "string", "html": "safe HTML using only p, strong, ul, li, br tags", "text": "plain text equivalent" },
+  "sms": "a respectful, personalised SMS under 320 characters, no links and one low-pressure question"
 }`;
 
   const user = `Business facts:\n${JSON.stringify(businessFacts, null, 2)}`;
