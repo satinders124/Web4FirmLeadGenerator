@@ -60,9 +60,10 @@ export default function LeadDashboard() {
     setForm((current) => ({ ...current, [event.target.name]: event.target.value }));
   }
 
-  async function search(event) {
+  async function search(event, overrideForm) {
     event?.preventDefault();
-    if (!form.query.trim()) return;
+    const activeForm = overrideForm || form;
+    if (!activeForm.query.trim()) return;
     setIsSearching(true);
     setNotice("Searching Google Places and checking listed website fields…");
     setNoticeType("info");
@@ -71,14 +72,19 @@ export default function LeadDashboard() {
       const response = await fetch("/api/leads/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: form.query, location: form.location, minRating: form.minRating, minReviews: form.minReviews }),
+        body: JSON.stringify({ query: activeForm.query, location: activeForm.location, minRating: activeForm.minRating, minReviews: activeForm.minReviews }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Search could not be completed.");
       setLeads(data.leads || []);
       setTotals(data.totals || { found: 0, noWebsite: 0 });
       setSelectedLead(data.leads?.[0] || null);
-      setNotice(data.leads?.length ? `${data.leads.length} potential no-website leads found.` : "No leads matched these filters. Try broadening your search.");
+      const message = data.leads?.length
+        ? `${data.leads.length} potential no-website leads found after checking ${data.pagesSearched || 1} result page${data.pagesSearched === 1 ? "" : "s"}.`
+        : data.totals?.found
+          ? `${data.totals.found} businesses were checked; they all list a website or fall below the selected filters.`
+          : "No businesses were returned for this search. Try a different category or location.";
+      setNotice(message);
       setNoticeType(data.leads?.length ? "success" : "info");
     } catch (error) {
       setLeads([]);
@@ -88,6 +94,12 @@ export default function LeadDashboard() {
     } finally {
       setIsSearching(false);
     }
+  }
+
+  function runSuggestedSearch(query) {
+    const nextForm = { ...form, query, minRating: "3", minReviews: "0" };
+    setForm(nextForm);
+    search(null, nextForm);
   }
 
   function toggleSave(lead) {
@@ -153,10 +165,10 @@ export default function LeadDashboard() {
         <main className="lead-main">
           <section className="lead-overview"><div><p className="overview-label">Lead map & results</p><h2>{leads.length ? `${leads.length} high-potential leads` : "Your lead canvas"}</h2><p>{notice || "Search a business category and location to begin."}</p></div><div className={`notice-pill ${noticeType}`}><Icon name={noticeType === "error" ? "info" : "spark"} size={15} />{noticeType === "error" ? "Configuration needed" : isSearching ? "Searching" : "Live workspace"}</div></section>
 
-          <section className="map-panel"><div className="map-panel-header"><div><h3><Icon name="mapPin" size={18} /> Geographic view</h3><p>Map uses OpenStreetMap; Google Places search remains secure on the server.</p></div><button type="button" onClick={() => setMapVisible((value) => !value)}><Icon name="mapPin" size={16} /> {mapVisible ? "Hide map" : "Show map"}</button></div>{mapVisible && <LeadMap leads={orderedLeads} selectedLead={selectedLead} onSelectLead={setSelectedLead} />}</section>
+          <section className="map-panel"><div className="map-panel-header"><div><h3><Icon name="mapPin" size={18} /> Geographic view</h3><p>Map uses OpenStreetMap; Google Places search remains secure on the server.</p></div>{orderedLeads.length > 0 && <button type="button" onClick={() => setMapVisible((value) => !value)}><Icon name="mapPin" size={16} /> {mapVisible ? "Hide map" : "Show map"}</button>}</div>{orderedLeads.length ? (mapVisible && <LeadMap leads={orderedLeads} selectedLead={selectedLead} onSelectLead={setSelectedLead} />) : <div className="map-empty-state"><Icon name="mapPin" size={25} /><div><strong>Map results will appear here</strong><span>Once a search finds potential leads, you can review their locations on the map.</span></div></div>}</section>
 
           <section className="results-section"><div className="results-header"><div><h3><Icon name="building" size={18} /> Businesses without listed websites <span>{orderedLeads.length}</span></h3><p>Website availability is based on the website field returned by Google Places.</p></div><label className="sort-control"><span>Sort by</span><select value={sortBy} onChange={(event) => setSortBy(event.target.value)}><option value="score">Lead score</option><option value="rating">Rating</option><option value="reviews">Reviews</option><option value="name">Name</option></select></label></div>
-            {isSearching ? <div className="results-empty"><span className="loading-ring" /><h4>Scanning business results…</h4><p>Checking the returned Google Places website fields and applying your filters.</p></div> : orderedLeads.length ? <div className="lead-grid">{orderedLeads.map((lead) => { const saved = leadStatus(lead, savedLeads); return <article key={lead.id} className={`lead-card ${selectedLead?.id === lead.id ? "selected" : ""}`} onClick={() => setSelectedLead(lead)}><div className="lead-card-top"><span className="lead-score">Score {lead.score}</span><button type="button" className={saved ? "saved" : ""} onClick={(event) => { event.stopPropagation(); toggleSave(lead); }} aria-label={saved ? "Remove saved lead" : "Save lead"}><Icon name={saved ? "bookmarkFilled" : "bookmark"} size={18} /></button></div><h4>{lead.name}</h4><p className="lead-category">{categoryLabel(lead.categories)}</p><div className="lead-rating"><Icon name="star" size={14} fill="currentColor" stroke={0} /><strong>{lead.rating || "—"}</strong><span>{lead.reviews} reviews</span></div><p className="lead-address"><Icon name="mapPin" size={15} /> {lead.address}</p>{lead.phone && <p className="lead-phone"><Icon name="phone" size={15} /> {lead.phone}</p>}<div className="lead-website-state"><Icon name="globe" size={15} /><span>No website listed</span></div><div className="lead-card-actions"><button type="button" onClick={(event) => { event.stopPropagation(); toggleSave(lead); }}><Icon name="bookmark" size={15} /> {saved ? "Saved" : "Save"}</button><button type="button" onClick={(event) => { event.stopPropagation(); setComposerLead(lead); }}><Icon name="mail" size={15} /> Email</button>{lead.mapsUrl && <a onClick={(event) => event.stopPropagation()} href={lead.mapsUrl} target="_blank" rel="noreferrer"><Icon name="external" size={15} /></a>}</div></article>; })}</div> : <div className="results-empty"><span className="empty-icon"><Icon name="search" size={34} /></span><h4>Ready to find leads?</h4><p>Search for a business category in a city, then review businesses with no listed website.</p></div>}</section>
+            {isSearching ? <div className="results-empty"><span className="loading-ring" /><h4>Scanning business results…</h4><p>Checking the returned Google Places website fields and applying your filters.</p></div> : orderedLeads.length ? <div className="lead-grid">{orderedLeads.map((lead) => { const saved = leadStatus(lead, savedLeads); return <article key={lead.id} className={`lead-card ${selectedLead?.id === lead.id ? "selected" : ""}`} onClick={() => setSelectedLead(lead)}><div className="lead-card-top"><span className="lead-score">Score {lead.score}</span><button type="button" className={saved ? "saved" : ""} onClick={(event) => { event.stopPropagation(); toggleSave(lead); }} aria-label={saved ? "Remove saved lead" : "Save lead"}><Icon name={saved ? "bookmarkFilled" : "bookmark"} size={18} /></button></div><h4>{lead.name}</h4><p className="lead-category">{categoryLabel(lead.categories)}</p><div className="lead-rating"><Icon name="star" size={14} fill="currentColor" stroke={0} /><strong>{lead.rating || "—"}</strong><span>{lead.reviews} reviews</span></div><p className="lead-address"><Icon name="mapPin" size={15} /> {lead.address}</p>{lead.phone && <p className="lead-phone"><Icon name="phone" size={15} /> {lead.phone}</p>}<div className="lead-website-state"><Icon name="globe" size={15} /><span>No website listed</span></div><div className="lead-card-actions"><button type="button" onClick={(event) => { event.stopPropagation(); toggleSave(lead); }}><Icon name="bookmark" size={15} /> {saved ? "Saved" : "Save"}</button><button type="button" onClick={(event) => { event.stopPropagation(); setComposerLead(lead); }}><Icon name="mail" size={15} /> Email</button>{lead.mapsUrl && <a onClick={(event) => event.stopPropagation()} href={lead.mapsUrl} target="_blank" rel="noreferrer"><Icon name="external" size={15} /></a>}</div></article>; })}</div> : <div className="results-empty"><span className="empty-icon"><Icon name={totals.found ? "globe" : "search"} size={34} /></span><h4>{totals.found ? "The results all list websites" : "Ready to find leads?"}</h4><p>{totals.found ? `We checked ${totals.found} businesses and none matched the “no website listed” filter. Try a narrower local category or slightly broader quality filters.` : "Search for a business category in a city, then review businesses with no listed website."}</p>{totals.found > 0 && <div className="suggested-searches"><span>Try a broader local search:</span><div><button type="button" onClick={() => runSuggestedSearch("hair salons")}>Hair salons</button><button type="button" onClick={() => runSuggestedSearch("florists")}>Florists</button><button type="button" onClick={() => runSuggestedSearch("electricians")}>Electricians</button></div></div>}</div>}</section>
         </main>
       </div>
       {composerLead && <EmailComposer lead={composerLead} onClose={() => setComposerLead(null)} onSent={(id) => markContacted(id)} />}
