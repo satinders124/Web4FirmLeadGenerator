@@ -39,6 +39,39 @@ function normalizeProposal(value, lead) {
   };
 }
 
+async function getAvailableModels(apiKey) {
+  try {
+    const response = await fetch("https://api.anthropic.com/v1/models", {
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+      },
+      cache: "no-store",
+    });
+    if (!response.ok) return [];
+    const data = await response.json();
+    return Array.isArray(data?.data) ? data.data.map((model) => model?.id).filter(Boolean) : [];
+  } catch (error) {
+    console.warn("Could not retrieve Anthropic model list", error);
+    return [];
+  }
+}
+
+function modelCandidates(availableIds) {
+  return Array.from(new Set([
+    process.env.ANTHROPIC_MODEL,
+    // Same preferred model/fallback order used by the working ProfitPnL repository.
+    "claude-sonnet-5",
+    ...availableIds.filter((id) => id.includes("sonnet")),
+    ...availableIds,
+    "claude-3-7-sonnet-20250219",
+    "claude-3-7-sonnet-latest",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-sonnet-latest",
+    "claude-3-haiku-20240307",
+  ].filter(Boolean)));
+}
+
 export async function POST(request) {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
@@ -86,45 +119,63 @@ Return ONLY valid JSON with this exact shape:
   const user = `Business facts:\n${JSON.stringify(businessFacts, null, 2)}`;
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514",
-        max_tokens: 1800,
-        temperature: 0.45,
-        system,
-        messages: [{ role: "user", content: user }],
-      }),
-    });
-    const result = await response.json();
-    if (!response.ok) {
-      console.error("Claude proposal error", response.status, result?.error?.message);
-      return NextResponse.json({ error: result?.error?.message || "Claude could not generate a proposal." }, { status: response.status });
+    const availableIds = await getAvailableModels(apiKey);
+    const modelsToTry = modelCandidates(availableIds);
+    let proposal = null;
+    let usedModel = "";
+    let lastError = "Claude could not generate a proposal.";
+
+    for (const model of modelsToTry) {
+      try {
+        const response = await fetch("https://api.anthropic.com/v1/messages", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          body: JSON.stringify({
+            model,
+            max_tokens: 1800,
+            temperature: 0.45,
+            system,
+            messages: [{ role: "user", content: user }],
+          }),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+          lastError = result?.error?.message || `Model ${model} could not run.`;
+          // A model name can be unavailable on the current key; try the next compatible candidate.
+          if (response.status === 404 || response.status === 400) continue;
+          if (response.status === 401 || response.status === 403 || response.status === 429) break;
+          continue;
+        }
+
+        const textBlock = result.content?.find((block) => block.type === "text");
+        proposal = normalizeProposal(JSON.parse(stripJsonFences(textBlock?.text)), lead);
+        usedModel = model;
+        break;
+      } catch (modelError) {
+        lastError = modelError?.message || String(modelError);
+        console.warn(`Claude model ${model} failed`, lastError);
+      }
     }
 
-    const textBlock = result.content?.find((block) => block.type === "text");
-    let parsed;
-    try {
-      parsed = JSON.parse(stripJsonFences(textBlock?.text));
-    } catch {
-      return NextResponse.json({ error: "Claude returned an unexpected proposal format. Please try again." }, { status: 502 });
+    if (!proposal) {
+      const available = availableIds.length ? ` Available models: ${availableIds.join(", ")}.` : "";
+      return NextResponse.json({ error: `${lastError}.${available}` }, { status: 502 });
     }
-    const proposal = normalizeProposal(parsed, lead);
+
     let crmSaved = false;
     if (hasSupabaseConfig()) {
       try {
-        await saveProposal({ lead, proposal, model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514" });
+        await saveProposal({ lead, proposal, model: usedModel });
         crmSaved = true;
       } catch (crmError) {
         console.error("Proposal generated but CRM save failed", crmError);
       }
     }
-    return NextResponse.json({ proposal, crmSaved });
+    return NextResponse.json({ proposal, model: usedModel, crmSaved });
   } catch (error) {
     console.error("Claude request failed", error);
     return NextResponse.json({ error: "Unable to reach Claude. Please try again." }, { status: 500 });

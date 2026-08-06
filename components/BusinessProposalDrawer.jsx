@@ -46,7 +46,7 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
       setSubject(data.proposal.email.subject);
       setBody(data.proposal.email.text);
       setPhase("ready");
-      setMessage("Tailored proposal ready. Review every detail before sending.");
+      setMessage(`Tailored proposal ready${data.model ? ` with ${data.model}` : ""}. Review every detail before sending.`);
     } catch (error) {
       setPhase("error");
       setMessage(error.message || "Unable to generate a proposal.");
