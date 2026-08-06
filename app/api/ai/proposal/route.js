@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
 import { categoryLabel } from "../../../../lib/lead-utils";
+import { saveProposal } from "../../../../lib/crm";
+import { hasSupabaseConfig } from "../../../../lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -112,7 +114,17 @@ Return ONLY valid JSON with this exact shape:
     } catch {
       return NextResponse.json({ error: "Claude returned an unexpected proposal format. Please try again." }, { status: 502 });
     }
-    return NextResponse.json({ proposal: normalizeProposal(parsed, lead) });
+    const proposal = normalizeProposal(parsed, lead);
+    let crmSaved = false;
+    if (hasSupabaseConfig()) {
+      try {
+        await saveProposal({ lead, proposal, model: process.env.ANTHROPIC_MODEL || "claude-sonnet-4-20250514" });
+        crmSaved = true;
+      } catch (crmError) {
+        console.error("Proposal generated but CRM save failed", crmError);
+      }
+    }
+    return NextResponse.json({ proposal, crmSaved });
   } catch (error) {
     console.error("Claude request failed", error);
     return NextResponse.json({ error: "Unable to reach Claude. Please try again." }, { status: 500 });

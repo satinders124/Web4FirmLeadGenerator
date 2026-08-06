@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { recordOutreach } from "../../../lib/crm";
+import { hasSupabaseConfig } from "../../../lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +25,7 @@ export async function POST(request) {
   const to = String(payload.to || "").trim();
   const subject = String(payload.subject || "").trim();
   const html = String(payload.html || "").trim();
+  const lead = payload.lead;
 
   if (!to || !subject || !html) {
     return NextResponse.json({ error: "Recipient, subject and message are required." }, { status: 400 });
@@ -43,7 +46,17 @@ export async function POST(request) {
       return NextResponse.json({ error: result?.message || "Email provider rejected this request." }, { status: resendResponse.status });
     }
 
-    return NextResponse.json({ ok: true, id: result.id });
+    let crmSaved = false;
+    if (lead?.id && hasSupabaseConfig()) {
+      try {
+        await recordOutreach({ lead, recipient: to, subject, html, providerMessageId: result.id });
+        crmSaved = true;
+      } catch (crmError) {
+        console.error("Email sent but CRM recording failed", crmError);
+      }
+    }
+
+    return NextResponse.json({ ok: true, id: result.id, crmSaved });
   } catch (error) {
     console.error("Email send failed", error);
     return NextResponse.json({ error: "Unable to contact the email provider." }, { status: 500 });

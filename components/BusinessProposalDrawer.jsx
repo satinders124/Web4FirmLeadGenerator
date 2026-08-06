@@ -70,7 +70,7 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
       const response = await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: recipient, subject, html: emailTextToHtml(body) }),
+        body: JSON.stringify({ to: recipient, subject, html: emailTextToHtml(body), lead }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to send email.");

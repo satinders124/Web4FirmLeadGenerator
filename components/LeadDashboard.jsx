@@ -102,6 +102,18 @@ export default function LeadDashboard() {
     search(null, nextForm);
   }
 
+  async function persistLeadToCrm(lead, overrides = {}) {
+    try {
+      await fetch("/api/crm/leads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead, overrides }),
+      });
+    } catch {
+      // Local saved leads remain usable if the CRM has not been configured yet.
+    }
+  }
+
   function toggleSave(lead) {
     const existing = leadStatus(lead, savedLeads);
     if (existing) {
@@ -110,6 +122,7 @@ export default function LeadDashboard() {
       return;
     }
     setSavedLeads((current) => [...current, { ...lead, status: "New", savedAt: new Date().toISOString() }]);
+    persistLeadToCrm(lead, { status: "new" });
     setNotice(`${lead.name} saved to your workspace.`);
     setNoticeType("success");
   }
@@ -146,7 +159,7 @@ export default function LeadDashboard() {
     <div className="lead-app-shell">
       <header className="app-topbar">
         <div className="app-brand"><span><Icon name="spark" size={22} /></span><div><strong>Web4Firm</strong><small>Lead intelligence workspace</small></div></div>
-        <div className="app-topbar-actions"><button type="button" onClick={exportCsv} className="export-button"><Icon name="download" size={16} /> Export saved leads</button><div className="app-status"><i /> Workspace ready</div></div>
+        <div className="app-topbar-actions"><a href="/pipeline" className="pipeline-link"><Icon name="chart" size={16} /> Outreach pipeline</a><button type="button" onClick={exportCsv} className="export-button"><Icon name="download" size={16} /> Export saved leads</button><div className="app-status"><i /> Workspace ready</div></div>
       </header>
 
       <div className="lead-workspace">
