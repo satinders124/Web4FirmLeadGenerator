@@ -43,7 +43,7 @@ The Google key is intentionally not exposed to the browser. Searches are routed 
 1. Create a Supabase project.
 2. Open **SQL Editor** and run [`supabase/schema.sql`](./supabase/schema.sql).
 3. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
-4. The new `/pipeline` page will then persist leads, proposals, sent emails and delivery/reply activity.
+4. The new `/pipeline` page will then persist leads, proposals, sent emails and manually updated reply/pipeline status.
 
 Keep the service role key server-side only. Use Vercel Deployment Protection or add app authentication before exposing the CRM dashboard to a broad audience.
 
@@ -51,28 +51,11 @@ Keep the service role key server-side only. Use Vercel Deployment Protection or 
 
 Add `ANTHROPIC_API_KEY` in Vercel to enable the proposal studio. Claude runs only through the secure server-side `/api/ai/proposal` route. It produces a tailored **new website** or **website redesign** opportunity, a recommended site outline and a reviewable sales email. Nothing is sent automatically: a team member must review the copy, enter a recipient and click Send.
 
-### Email and reply tracking setup
+### Email and manual reply tracking setup
 
 Email sends use [Resend](https://resend.com/) via `/api/email`. Add a verified sender domain and set `RESEND_API_KEY` and `SENDER_EMAIL` in Vercel. Each successful send is stored against the lead in Supabase.
 
-For reply tracking, connect the shared Web4Firm Gmail/Google Workspace inbox with Google OAuth and add:
-
-```bash
-GMAIL_CLIENT_ID=...
-GMAIL_CLIENT_SECRET=...
-GMAIL_REFRESH_TOKEN=...
-GMAIL_USER_EMAIL=hello@your-domain.com
-```
-
-The **Outreach Pipeline** page can then sync the inbox manually. It matches incoming sender addresses to outreach recipients, records a reply, updates the email/lead status to `replied`, and preserves the reply record in Supabase. Use an inbox dedicated to outreach so reply matching stays clean.
-
-Create the refresh token using the Google OAuth scope:
-
-```text
-https://www.googleapis.com/auth/gmail.readonly
-```
-
-Use a dedicated Google Workspace outreach inbox such as `hello@your-domain.com` rather than a personal mailbox.
+When a business replies in your normal email inbox, open `/pipeline` and click **Mark reply received** (or choose `Replied` from the status menu). The pipeline stores that status permanently in Supabase, alongside the sent email record. This keeps the workflow simple without requiring Gmail OAuth credentials.
 
 ## Run locally
 

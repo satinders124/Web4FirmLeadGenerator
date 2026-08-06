@@ -24,7 +24,7 @@ export async function GET() {
       totalLeads: leadsResult.data.length,
       newLeads: leadsResult.data.filter((lead) => lead.status === "new" || lead.status === "proposal_ready").length,
       contacted: leadsResult.data.filter((lead) => ["contacted", "delivered", "replied", "qualified", "won"].includes(lead.status)).length,
-      replies: repliesResult.data.length,
+      replies: leadsResult.data.filter((lead) => ["replied", "qualified", "won"].includes(lead.status)).length,
       emailsSent: emailResult.data.filter((email) => email.status !== "draft").length,
     };
 
