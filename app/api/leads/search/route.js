@@ -70,6 +70,7 @@ export async function POST(request) {
   const location = String(payload.location || "").trim();
   const minRating = Math.max(0, Number(payload.minRating || 0));
   const minReviews = Math.max(0, Number(payload.minReviews || 0));
+  const prospectType = payload.prospectType === "all" ? "all" : "noWebsite";
 
   if (!query) return invalid("Enter a business category or search query.");
 
@@ -89,7 +90,7 @@ export async function POST(request) {
       const pageLeads = (result.places || []).map(normalizePlace);
       all = [...all, ...pageLeads];
       candidates = all
-        .filter((lead) => !lead.website && lead.rating >= minRating && lead.reviews >= minReviews)
+        .filter((lead) => (prospectType === "all" || !lead.website) && lead.rating >= minRating && lead.reviews >= minReviews)
         .map((lead) => ({ ...lead, score: leadScore(lead) }))
         .sort((a, b) => b.score - a.score);
 
@@ -104,6 +105,7 @@ export async function POST(request) {
     return NextResponse.json(
       {
         query: textQuery,
+        prospectType,
         pagesSearched,
         totals: { found: uniqueAll.length, noWebsite: uniqueCandidates.length },
         leads: uniqueCandidates,

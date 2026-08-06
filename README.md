@@ -9,7 +9,8 @@ A secure Next.js lead discovery workspace for finding Google Business Profile en
 - Candidate list restricted to results without a Google Places `websiteUri`
 - Lead score, saved leads, contacted status and CSV export (saved locally in the browser)
 - OpenStreetMap lead map with result markers
-- Cold-email composer with preview and copy-to-clipboard
+- Claude-powered, review-first website proposal and professional sales-email drafting
+- Human-reviewed email preview, copy and send flow
 - Optional secure Resend server-side email send route
 - Responsive B2B dashboard UI
 
@@ -19,6 +20,8 @@ Copy `.env.example` to `.env.local` for development, then configure equivalent v
 
 ```bash
 GOOGLE_MAPS_API_KEY=...
+ANTHROPIC_API_KEY=...
+ANTHROPIC_MODEL=claude-sonnet-4-20250514
 RESEND_API_KEY=...
 SENDER_EMAIL=Web4Firm <hello@your-verified-domain.com>
 ```
@@ -31,6 +34,10 @@ SENDER_EMAIL=Web4Firm <hello@your-verified-domain.com>
 4. Add it as `GOOGLE_MAPS_API_KEY` in Vercel.
 
 The Google key is intentionally not exposed to the browser. Searches are routed through `/api/leads/search`.
+
+### Claude proposal setup
+
+Add `ANTHROPIC_API_KEY` in Vercel to enable the proposal studio. Claude runs only through the secure server-side `/api/ai/proposal` route. It produces a tailored **new website** or **website redesign** opportunity, a recommended site outline and a reviewable sales email. Nothing is sent automatically: a team member must review the copy, enter a recipient and click Send.
 
 ### Email setup
 
