@@ -5,6 +5,7 @@ import { useEffect, useMemo, useState } from "react";
 import { categoryLabel } from "../lib/lead-utils";
 import { Icon } from "./Icons";
 import BusinessProposalDrawer from "./BusinessProposalDrawer";
+import SearchPlanner from "./SearchPlanner";
 
 const LeadMap = dynamic(() => import("./LeadMap"), {
   ssr: false,
@@ -96,8 +97,18 @@ export default function LeadDashboard() {
     }
   }
 
-  function runSuggestedSearch(query) {
-    const nextForm = { ...form, query, minRating: "3", minReviews: "0" };
+  function runSuggestedSearch(suggestion) {
+    const details = typeof suggestion === "string"
+      ? { query: suggestion, minRating: "3", minReviews: "0" }
+      : suggestion;
+    const nextForm = {
+      ...form,
+      query: details.query,
+      location: details.location || form.location,
+      minRating: String(details.minRating ?? 3),
+      minReviews: String(details.minReviews ?? 0),
+      prospectType: details.prospectType || form.prospectType,
+    };
     setForm(nextForm);
     search(null, nextForm);
   }
@@ -172,6 +183,7 @@ export default function LeadDashboard() {
             <div className="filter-grid"><label><span><Icon name="star" size={15} /> Min. rating</span><select name="minRating" value={form.minRating} onChange={updateForm}><option value="0">Any rating</option><option value="3">3+ stars</option><option value="3.5">3.5+ stars</option><option value="4">4+ stars</option><option value="4.5">4.5+ stars</option></select></label><label><span><Icon name="message" size={15} /> Min. reviews</span><input name="minReviews" type="number" min="0" value={form.minReviews} onChange={updateForm} /></label></div>
             <button type="submit" className="lead-search-button" disabled={isSearching}><Icon name={isSearching ? "spark" : "search"} size={17} />{isSearching ? "Finding leads…" : "Find businesses"}</button>
           </form>
+          <SearchPlanner location={form.location} currentQuery={form.query} onUseRecommendation={runSuggestedSearch} />
           <div className="lead-stats"><div><b>{totals.found}</b><span>Found</span></div><div><b>{totals.noWebsite}</b><span>{form.prospectType === "all" ? "Qualified" : "No website"}</span></div><div><b>{contacted}</b><span>Contacted</span></div></div>
           <div className="saved-summary"><div><h2><Icon name="bookmark" size={16} /> Saved leads</h2><span>{savedLeads.length}</span></div>{savedLeads.length ? <div className="saved-mini-list">{savedLeads.slice(-4).reverse().map((lead) => <button type="button" key={lead.id} onClick={() => setSelectedLead(lead)}><span>{lead.name}</span><small>{lead.status}</small></button>)}</div> : <p>Save promising businesses to keep your shortlist here.</p>}</div>
         </aside>
