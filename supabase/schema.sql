@@ -77,8 +77,8 @@ create table if not exists public.outreach_sms (
 create table if not exists public.inbound_replies (
   id uuid primary key default gen_random_uuid(),
   provider_message_id text unique,
-  lead_id uuid references public.leads(id) on delete set null,
-  outreach_email_id uuid references public.outreach_emails(id) on delete set null,
+  lead_id uuid references public.leads(id) on delete cascade,
+  outreach_email_id uuid references public.outreach_emails(id) on delete cascade,
   from_email text,
   subject text,
   body_text text,

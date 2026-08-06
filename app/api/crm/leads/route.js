@@ -18,3 +18,22 @@ export async function POST(request) {
     return NextResponse.json({ error: "Unable to save lead to the CRM." }, { status: 500 });
   }
 }
+
+export async function DELETE(request) {
+  if (!hasSupabaseConfig()) {
+    return NextResponse.json({ error: "Supabase CRM is not configured yet." }, { status: 503 });
+  }
+  const { searchParams } = new URL(request.url);
+  const id = searchParams.get("id");
+  if (!id) return NextResponse.json({ error: "Lead ID is required." }, { status: 400 });
+
+  try {
+    const supabase = (await import("../../../../lib/supabase-admin")).getSupabaseAdmin();
+    const { error } = await supabase.from("leads").delete().eq("id", id);
+    if (error) throw error;
+    return NextResponse.json({ ok: true });
+  } catch (error) {
+    console.error("CRM lead delete failed", error);
+    return NextResponse.json({ error: "Unable to delete lead from the CRM." }, { status: 500 });
+  }
+}
