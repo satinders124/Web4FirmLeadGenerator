@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { recordOutreach } from "../../../lib/crm";
+import { recordOutreach, scheduleFollowUps } from "../../../lib/crm";
 import { hasSupabaseConfig } from "../../../lib/supabase-admin";
 
 export const dynamic = "force-dynamic";
@@ -26,6 +26,7 @@ export async function POST(request) {
   const subject = String(payload.subject || "").trim();
   const html = String(payload.html || "").trim();
   const lead = payload.lead;
+  const followUps = Array.isArray(payload.followUps) ? payload.followUps : [];
 
   if (!to || !subject || !html) {
     return NextResponse.json({ error: "Recipient, subject and message are required." }, { status: 400 });
@@ -47,16 +48,21 @@ export async function POST(request) {
     }
 
     let crmSaved = false;
+    let followUpsScheduled = 0;
     if (lead?.id && hasSupabaseConfig()) {
       try {
-        await recordOutreach({ lead, recipient: to, subject, html, providerMessageId: result.id });
+        const recorded = await recordOutreach({ lead, recipient: to, subject, html, providerMessageId: result.id });
         crmSaved = true;
+        if (followUps.length) {
+          const scheduled = await scheduleFollowUps({ lead, outreachEmail: recorded.outreach, followUps });
+          followUpsScheduled = scheduled.length;
+        }
       } catch (crmError) {
         console.error("Email sent but CRM recording failed", crmError);
       }
     }
 
-    return NextResponse.json({ ok: true, id: result.id, crmSaved });
+    return NextResponse.json({ ok: true, id: result.id, crmSaved, followUpsScheduled });
   } catch (error) {
     console.error("Email send failed", error);
     return NextResponse.json({ error: "Unable to contact the email provider." }, { status: 500 });

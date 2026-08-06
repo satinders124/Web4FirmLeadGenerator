@@ -37,6 +37,13 @@ function normalizeProposal(value, lead) {
       text: String(email.text || `Hi ${lead.name},\n\nI noticed an opportunity to improve your online presence. Web4Firm can help with a clear, mobile-friendly website that makes it easier for customers to find and contact you.\n\nWould you be open to a short, no-pressure conversation?\n\nKind regards,\nWeb4Firm`).slice(0, 7000),
     },
     sms: String(proposal.sms || `Hi ${lead.name}, I noticed an opportunity to strengthen your online presence with a clear, mobile-friendly website. Would you be open to a quick no-pressure chat? — Web4Firm`).replace(/\s+/g, " ").trim().slice(0, 320),
+    followUps: Array.isArray(proposal.followUps)
+      ? proposal.followUps.slice(0, 3).map((item, index) => ({
+          dayOffset: Number(item?.dayOffset) || [3, 7, 14][index],
+          subject: String(item?.subject || `Following up — ${lead.name}`).slice(0, 140),
+          text: String(item?.text || "Just following up in case this is useful for your business.").slice(0, 2400),
+        }))
+      : [],
   };
 }
 
@@ -102,11 +109,14 @@ export async function POST(request) {
     websiteStatus: lead.website ? `Website listed: ${lead.website}` : "No website listed in Google Places",
   };
 
+  const bookingUrl = process.env.WEB4FIRM_BOOKING_URL || "";
   const system = `You are a senior B2B website consultant and ethical sales copywriter for Web4Firm. Web4Firm helps local businesses with professional, mobile-first websites, clear services/pages, enquiry flows, local discoverability foundations, and Google Business Profile alignment.
 
 Create a concise, credible, highly personalised website opportunity and sales email using ONLY the business facts provided. Do not invent services, awards, customers, locations, business history, revenue, or problems. If a detail is unknown, frame it as a possibility or a question, never as a fact.
 
 If the business has no website listed, pitch a new website. If a website is listed, pitch a respectful website redesign/conversion improvement. The email must be warm, specific, short enough to send manually, non-pushy, and include a single low-pressure call to action. Do not mention AI, scraping, lead generation, Google Places, or data collection. Do not make guarantees.
+
+Booking URL: ${bookingUrl || "Not configured"}. Include this link at most once only when it is configured and naturally useful. Never invent a booking link.
 
 Return ONLY valid JSON with this exact shape:
 {
@@ -115,7 +125,12 @@ Return ONLY valid JSON with this exact shape:
   "summary": "string",
   "websitePlan": { "pages": ["string"], "features": ["string"], "benefits": ["string"] },
   "email": { "subject": "string", "html": "safe HTML using only p, strong, ul, li, br tags", "text": "plain text equivalent" },
-  "sms": "a respectful, personalised SMS under 320 characters, no links and one low-pressure question"
+  "sms": "a respectful, personalised SMS under 320 characters, no links and one low-pressure question",
+  "followUps": [
+    { "dayOffset": 3, "subject": "string", "text": "short respectful follow-up" },
+    { "dayOffset": 7, "subject": "string", "text": "short respectful follow-up" },
+    { "dayOffset": 14, "subject": "string", "text": "final short respectful follow-up" }
+  ]
 }`;
 
   const user = `Business facts:\n${JSON.stringify(businessFacts, null, 2)}`;

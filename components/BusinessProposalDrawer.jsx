@@ -18,6 +18,11 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [sms, setSms] = useState("");
+  const [audit, setAudit] = useState(null);
+  const [auditPhase, setAuditPhase] = useState("idle");
+  const [auditMessage, setAuditMessage] = useState("");
+  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewPhase, setPreviewPhase] = useState("idle");
   const [phase, setPhase] = useState("idle");
   const [message, setMessage] = useState("");
   const [preview, setPreview] = useState(false);
@@ -28,6 +33,11 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
     setSubject("");
     setBody("");
     setSms("");
+    setAudit(null);
+    setAuditPhase("idle");
+    setAuditMessage("");
+    setPreviewUrl("");
+    setPreviewPhase("idle");
     setPhase("idle");
     setMessage("");
     setPreview(false);
@@ -56,6 +66,57 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
     }
   }
 
+  async function generateAudit() {
+    setAuditPhase("generating");
+    setAuditMessage(lead.website ? "Reviewing visible website signals and creating an opportunity score…" : "Creating a new website opportunity score…");
+    try {
+      const response = await fetch("/api/ai/website-audit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to create the website audit.");
+      setAudit(data.audit);
+      setAuditPhase("ready");
+      setAuditMessage(`Opportunity score created${data.model ? ` with ${data.model}` : ""}.`);
+    } catch (error) {
+      setAuditPhase("error");
+      setAuditMessage(error.message || "Unable to create the website audit.");
+    }
+  }
+
+  async function createPreview() {
+    if (!proposal) {
+      setPreviewPhase("error");
+      return;
+    }
+    setPreviewPhase("creating");
+    try {
+      const response = await fetch("/api/demo", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ lead, proposal, audit }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to create preview.");
+      setPreviewUrl(data.url);
+      setPreviewPhase("ready");
+    } catch (error) {
+      setPreviewPhase("error");
+      setMessage(error.message || "Unable to create preview.");
+    }
+  }
+
+  async function copyPreviewUrl() {
+    try {
+      await navigator.clipboard.writeText(previewUrl);
+      setMessage("Preview link copied to your clipboard.");
+    } catch {
+      setMessage("Copy is unavailable in this browser.");
+    }
+  }
+
   async function sendEmail() {
     if (!recipient.trim()) {
       setMessage("Enter the business email address before sending.");
@@ -73,13 +134,13 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
       const response = await fetch("/api/email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ to: recipient, subject, html: emailTextToHtml(body), lead }),
+        body: JSON.stringify({ to: recipient, subject, html: emailTextToHtml(body), lead, followUps: proposal?.followUps || [] }),
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to send email.");
       onMarkContacted(lead.id);
       setPhase("sent");
-      setMessage("Email sent and lead marked as contacted.");
+      setMessage(`Email sent and lead marked as contacted.${data.followUpsScheduled ? ` ${data.followUpsScheduled} follow-up${data.followUpsScheduled === 1 ? "" : "s"} added to the queue.` : ""}`);
     } catch (error) {
       setPhase("error");
       setMessage(error.message || "Unable to send email.");
@@ -153,11 +214,18 @@ export default function BusinessProposalDrawer({ lead, isSaved, onClose, onToggl
           <button type="button" onClick={() => onToggleSave(lead)}><Icon name={isSaved ? "bookmarkFilled" : "bookmark"} size={16} /> {isSaved ? "Saved lead" : "Save lead"}</button>
         </div>
 
+        <section className="audit-studio">
+          <div className="audit-studio-heading"><div><p className="drawer-eyebrow">AI website audit</p><h3>{lead.website ? "Review current website signals" : "Score the new website opportunity"}</h3><p>{lead.website ? "Review public, visible technical signals and turn them into a respectful redesign opportunity." : "Build an evidence-aware new website opportunity using the business details available."}</p></div><button type="button" onClick={generateAudit} disabled={auditPhase === "generating"}><Icon name="chart" size={16} /> {auditPhase === "generating" ? "Auditing…" : audit ? "Refresh audit" : "Run audit"}</button></div>
+          {audit && <div className="audit-result"><div className="audit-score"><strong>{audit.opportunityScore}</strong><span>Opportunity<br />score</span></div><div><h4>{audit.headline}</h4><p>{audit.summary}</p><div className="audit-columns"><div><b>Strengths</b><ul>{audit.strengths.map((item) => <li key={item}>{item}</li>)}</ul></div><div><b>Opportunities</b><ul>{audit.opportunities.map((item) => <li key={item}>{item}</li>)}</ul></div><div><b>Recommended next steps</b><ul>{audit.recommendedActions.map((item) => <li key={item}>{item}</li>)}</ul></div></div></div></div>}
+          {auditMessage && <p className={`audit-message ${auditPhase === "error" ? "error" : ""}`}>{auditMessage}</p>}
+        </section>
+
         {!proposal ? <div className="proposal-start"><span className="proposal-ai-icon"><Icon name="spark" size={25} /></span><h3>Build a tailored proposal</h3><p>Claude will use only the business details shown here to create a professional website opportunity and a respectful, reviewable outreach email.</p><button type="button" onClick={generateProposal} disabled={phase === "generating"} className="generate-proposal-button"><Icon name="spark" size={17} /> {phase === "generating" ? "Creating proposal…" : "Generate with Claude"}</button>{message && <p className={`proposal-message ${phase === "error" ? "error" : ""}`}>{message}</p>}</div> : <>
           <div className="proposal-output">
             <div className="proposal-title-row"><span className="proposal-type">{proposal.opportunityType}</span><button type="button" onClick={generateProposal} disabled={phase === "generating"}><Icon name="spark" size={15} /> Refresh</button></div>
             <h3>{proposal.headline}</h3><p>{proposal.summary}</p>
             <div className="proposal-plan"><div><h4>Recommended website shape</h4><ul>{proposal.websitePlan.pages.map((item) => <li key={item}><Icon name="check" size={14} /> {item}</li>)}</ul></div><div><h4>What Web4Firm can include</h4><ul>{proposal.websitePlan.features.map((item) => <li key={item}><Icon name="check" size={14} /> {item}</li>)}</ul></div><div><h4>Business value</h4><ul>{proposal.websitePlan.benefits.map((item) => <li key={item}><Icon name="check" size={14} /> {item}</li>)}</ul></div></div>
+            <div className="website-preview-action"><div><span><Icon name="spark" size={17} /></span><div><h4>Instant website concept</h4><p>Create a private, shareable demo page using this proposal—not a live business website.</p></div></div>{previewUrl ? <div className="preview-ready"><a href={previewUrl} target="_blank" rel="noreferrer"><Icon name="external" size={15} /> Open preview</a><button type="button" onClick={copyPreviewUrl}><Icon name="copy" size={15} /> Copy link</button></div> : <button type="button" onClick={createPreview} disabled={previewPhase === "creating"}>{previewPhase === "creating" ? "Creating preview…" : "Create preview"}</button>}</div>
           </div>
 
           <div className="proposal-email">

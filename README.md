@@ -10,7 +10,10 @@ A secure Next.js lead discovery workspace for finding Google Business Profile en
 - Lead score, saved leads, contacted status and CSV export
 - Supabase-backed outreach pipeline for persistent lead, proposal and email records
 - OpenStreetMap lead map with result markers
-- Claude-powered, review-first website proposal and professional sales-email drafting
+- Claude-powered, review-first website proposal, website audit and professional sales-email drafting
+- Instant private website concept preview links for strong prospects
+- Manual SMS draft, copy, phone composer and pipeline tracking
+- Manual three-step follow-up queue (reviewed before sending)
 - Human-reviewed email preview, copy and send flow
 - Optional secure Resend server-side email send route
 - Responsive B2B dashboard UI
@@ -25,6 +28,7 @@ SUPABASE_URL=...
 SUPABASE_SERVICE_ROLE_KEY=...
 ANTHROPIC_API_KEY=...
 ANTHROPIC_MODEL=claude-sonnet-5
+WEB4FIRM_BOOKING_URL=https://your-booking-link.example
 RESEND_API_KEY=...
 SENDER_EMAIL=Web4Firm <hello@your-verified-domain.com>
 ```
@@ -49,7 +53,9 @@ Keep the service role key server-side only. Use Vercel Deployment Protection or 
 
 ### Claude proposal setup
 
-Add `ANTHROPIC_API_KEY` in Vercel to enable the proposal studio. Claude runs only through the secure server-side `/api/ai/proposal` route. It produces a tailored **new website** or **website redesign** opportunity, a recommended site outline and a reviewable sales email. Nothing is sent automatically: a team member must review the copy, enter a recipient and click Send.
+Add `ANTHROPIC_API_KEY` in Vercel to enable the proposal studio. Claude runs only through secure server-side routes. It produces a tailored **new website** or **website redesign** opportunity, a recommended site outline, website audit, reviewable sales email, SMS draft and three manual follow-up drafts. Nothing is sent automatically: a team member must review the copy, enter a recipient and click Send.
+
+Set `WEB4FIRM_BOOKING_URL` to include a real booking link in the generated email/follow-up copy. Leave it blank until a booking system is ready—the app will not invent a link.
 
 ### Email and manual reply tracking setup
 
