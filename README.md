@@ -49,7 +49,28 @@ The Google key is intentionally not exposed to the browser. Searches are routed 
 3. Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Vercel.
 4. The new `/pipeline` page will then persist leads, proposals, sent emails and manually updated reply/pipeline status.
 
-Keep the service role key server-side only. Use Vercel Deployment Protection or add app authentication before exposing the CRM dashboard to a broad audience.
+Keep the service role key server-side only. Never add it to browser code.
+
+### Team sign-in and roles
+
+Web4Firm uses Supabase Auth email/password accounts. Create the two team users in **Supabase → Authentication → Users → Add user** (for example an admin account and a team-member account), then set individual passwords. Do not share one password.
+
+Add the matching public Supabase values in Vercel:
+
+```bash
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
+```
+
+The middleware redirects unauthenticated visitors to `/login`. New Supabase Auth users receive the `member` role automatically. Promote one user to admin in Supabase SQL Editor:
+
+```sql
+update public.user_profiles
+set role = 'admin'
+where email = 'admin@your-domain.com';
+```
+
+Admins can delete lead records; members can search, generate proposals, use manual outreach and update pipeline status.
 
 ### Claude proposal setup
 
@@ -64,6 +85,8 @@ Email sends use [Resend](https://resend.com/) via `/api/email`. Add a verified s
 When a business replies in your normal email inbox, open `/pipeline` and click **Mark reply received** (or choose `Replied` from the status menu). The pipeline stores that status permanently in Supabase, alongside the sent email record. This keeps the workflow simple without requiring Gmail OAuth credentials.
 
 ## Run locally
+
+Use Node.js 22 or later for the current Supabase packages.
 
 ```bash
 npm install

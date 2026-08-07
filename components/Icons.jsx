@@ -26,6 +26,7 @@ export function Icon({ name, size = 20, stroke = 1.8, className = "", fill = "no
     chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
     plus: <><path d="M12 5v14" /><path d="M5 12h14" /></>,
     menu: <><path d="M4 7h16" /><path d="M4 12h16" /><path d="M4 17h16" /></>,
+    shield: <path d="M12 3 5 6v5c0 5 3 8.5 7 10 4-1.5 7-5 7-10V6l-7-3Z" />,
     trash: <><path d="M4 7h16" /><path d="M10 11v6M14 11v6" /><path d="M6 7l1 14h10l1-14M9 7V4h6v3" /></>,
   };
   return <svg {...common}>{icons[name] || icons.spark}</svg>;

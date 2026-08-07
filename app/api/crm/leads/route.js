@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { upsertCrmLead } from "../../../../lib/crm";
 import { hasSupabaseConfig } from "../../../../lib/supabase-admin";
+import { requireAdmin } from "../../../../lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -23,6 +24,8 @@ export async function DELETE(request) {
   if (!hasSupabaseConfig()) {
     return NextResponse.json({ error: "Supabase CRM is not configured yet." }, { status: 503 });
   }
+  const auth = await requireAdmin();
+  if (auth.error) return auth.error;
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Lead ID is required." }, { status: 400 });

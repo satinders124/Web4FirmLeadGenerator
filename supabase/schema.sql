@@ -3,6 +3,38 @@
 
 create extension if not exists "pgcrypto";
 
+-- Team access: accounts are created in Supabase Auth, then a profile is created automatically.
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  role text check (role in ('admin', 'member')) not null default 'member',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = public
+as $$
+begin
+  insert into public.user_profiles (id, email, role)
+  values (new.id, new.email, 'member')
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+after insert on auth.users
+for each row execute function public.handle_new_user();
+
+-- Backfill profiles if users were created before this schema was applied.
+insert into public.user_profiles (id, email, role)
+select id, email, 'member' from auth.users
+on conflict (id) do nothing;
+
 create table if not exists public.leads (
   id uuid primary key default gen_random_uuid(),
   google_place_id text unique not null,
@@ -147,6 +179,11 @@ create trigger website_previews_set_updated_at
 before update on public.website_previews
 for each row execute function public.set_updated_at();
 
+drop trigger if exists user_profiles_set_updated_at on public.user_profiles;
+create trigger user_profiles_set_updated_at
+before update on public.user_profiles
+for each row execute function public.set_updated_at();
+
 alter table public.inbound_replies add column if not exists provider_message_id text;
 alter table public.proposals add column if not exists sms_text text;
 create unique index if not exists inbound_replies_provider_message_idx on public.inbound_replies(provider_message_id);
@@ -160,6 +197,12 @@ create index if not exists audits_lead_idx on public.website_audits(lead_id);
 create index if not exists followups_due_idx on public.follow_ups(status, due_at);
 create index if not exists previews_lead_idx on public.website_previews(lead_id);
 create index if not exists replies_lead_idx on public.inbound_replies(lead_id);
+
+-- Authenticated users can only read their own access profile. CRM data is accessed server-side via the service role key.
+alter table public.user_profiles enable row level security;
+drop policy if exists "users can view own profile" on public.user_profiles;
+create policy "users can view own profile" on public.user_profiles
+for select using (auth.uid() = id);
 
 -- The application uses the Supabase service role key only from server-side Next.js API routes.
 -- Keep RLS enabled; do not expose the service role key to the browser.

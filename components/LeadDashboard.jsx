@@ -6,6 +6,7 @@ import { categoryLabel } from "../lib/lead-utils";
 import { Icon } from "./Icons";
 import BusinessProposalDrawer from "./BusinessProposalDrawer";
 import SearchPlanner from "./SearchPlanner";
+import LogoutButton from "./LogoutButton";
 
 const LeadMap = dynamic(() => import("./LeadMap"), {
   ssr: false,
@@ -170,7 +171,7 @@ export default function LeadDashboard() {
     <div className="lead-app-shell">
       <header className="app-topbar">
         <div className="app-brand"><span><Icon name="spark" size={22} /></span><div><strong>Web4Firm</strong><small>Lead intelligence workspace</small></div></div>
-        <div className="app-topbar-actions"><a href="/pipeline" className="pipeline-link"><Icon name="chart" size={16} /> Outreach pipeline</a><button type="button" onClick={exportCsv} className="export-button"><Icon name="download" size={16} /> Export saved leads</button><div className="app-status"><i /> Workspace ready</div></div>
+        <div className="app-topbar-actions"><a href="/pipeline" className="pipeline-link"><Icon name="chart" size={16} /> Outreach pipeline</a><button type="button" onClick={exportCsv} className="export-button"><Icon name="download" size={16} /> Export saved leads</button><div className="app-status"><i /> Workspace ready</div><LogoutButton /></div>
       </header>
 
       <div className="lead-workspace">
